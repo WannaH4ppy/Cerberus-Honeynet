@@ -1,0 +1,62 @@
+services: #kazdy wpis (wcięty) to osobny wirutalny serwer
+#Konfiguracja Cowrie (SSH/TELNET)
+
+  cowrie: 
+   image: cowrie/cowrie:latest #laduje najnowszy obraz, jesli nie ma to pobiera
+   container_name: COWRIE  #nazwa wyswietlana po wpisaniu np: docker ps
+   restart: always  #jesli sie wykrzaczy to zapewnia stablinosc 
+   ports: 
+    - "2222:2222" #PORT HOSTA:PORT KONTENERA SSH
+    - "2223:2223" #TELNET
+   volumes: 
+    - ./cowrie/log:/cowrie/cowrie-git/var/log/cowrie
+   #mapowanie dysku.   Sciezka_Hosta : Sciezka_Kontenera
+   #lustra, wszystko co cowrie zapisze "u siebie" pojawi sie u mnie
+   deploy:
+    resources:
+     limits:
+      cpus: '0.50'
+      memory: 512M
+
+  dionaea:
+   image: dinotools/dionaea:latest
+   container_name: DIONAEA
+   restart: always
+   ports:
+    - "21:21" #FTP
+    - "42:42" #WINS tlumaczt adresy nazw komputerow na IP (pradziadek DNS xd)
+    - "135:135" #MS-RPC microsoft remote procedure call. Zdalne zarzadzanie uslugami
+    #Lewa_Strona = Prawa_Strona, wiec port na PC prowadzi do portu na Honeypocie
+    - "8445:445" #zmieniony by uniknac konfliktu z Windowsem
+   volumes: 
+   - ./dionaea/data:/opt/dionaea/var
+   #mapowanie i przechwytywanie
+   deploy:
+    resources:
+     limits:
+      cpus: '0.50'
+      memory: 512M
+
+
+#zmiana portu 445? Oryginalny port to 445 SMB, nie jest latwo uruchomic dwie
+#na jednym porcie a Windows czesto go zajmuje na udostpenianie plikow
+#dlatego robimy przekierowanie, wada jest to ze atakujacy celuje w 8445 a nie 445
+
+  real-os:
+   build: ./real-os #budujemy system z folderu, plik Dockerfile
+   container_name: REAL-OS 
+   restart: always
+   ports:
+    - "2224:22" #hacker whcodzi na port 2224
+   #uprawnienia do Auditd
+   cap_add:
+    - AUDIT_CONTROL
+    - AUDIT_WRITE
+   volumes:
+    - ./real-os/logs:/var/log  #wyciagamy logi
+    
+   deploy:
+    resources:
+     limits: 
+      cpus: "2.0"
+      memory: "2G"
