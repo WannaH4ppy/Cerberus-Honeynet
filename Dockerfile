@@ -1,7 +1,6 @@
 FROM ubuntu:22.04
 
-# 1. Instalacja pakietów
-# Dodajemy 'kmod' potrzebny czasem dla auditd
+# 1.Instalacja pakietów
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y \
     openssh-server \
@@ -10,23 +9,23 @@ RUN apt-get update && \
     nano \
     && rm -rf /var/lib/apt/lists/*
 
-# 2. Konfiguracja SSH
+# 2.Konfiguracja SSH
 # Tworzymy katalog wymagany przez SSHD (bo nie uzywamy 'service')
 RUN mkdir -p /run/sshd
 RUN echo 'root:root' | chpasswd
 RUN sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
 
-# --- KONFIGURACJA RSYSLOG ---
+#KONFIGURACJA RSYSLOG
 # Wyłączamy imklog (moduł kernela, nie działa w dockerze)
 RUN sed -i '/imklog/s/^/#/' /etc/rsyslog.conf
 # Włączamy nasłuchiwanie na sockecie /dev/log (kluczowe dla komendy logger)
 RUN sed -i '/imuxsock/s/^#//' /etc/rsyslog.conf
 
-# --- SZPIEG BASHA ---
+#SZPIEG BASHA
 RUN echo 'export PROMPT_COMMAND="history -a; logger -t HACKER_CMD -p user.info \"\$(history 1)\""' >> /etc/bash.bashrc
 RUN echo 'export PROMPT_COMMAND="history -a; logger -t HACKER_CMD -p user.info \"\$(history 1)\""' >> /root/.bashrc
 
-# 3. Tworzenie skryptu startowego (WERSJA "DIRECT EXECUTION")
+# Tworzenie skryptu startowego (WERSJA "DIRECT EXECUTION")
 # Omijamy komendę 'service' i uruchamiamy demony bezpośrednio.
 RUN printf '#!/bin/bash\n\
 echo "--- INICJALIZACJA KONTENERA ---"\n\
@@ -53,7 +52,7 @@ echo "--- SYSTEM GOTOWY ---"\n\
 # 4. Utrzymanie kontenera przy życiu\n\
 tail -f /var/log/syslog\n' > /start.sh
 
-# 4. Start
+# 4.Start
 RUN chmod +x /start.sh
 EXPOSE 22
 CMD ["/start.sh"]
