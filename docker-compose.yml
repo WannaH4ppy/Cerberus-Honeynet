@@ -1,57 +1,128 @@
-services: #kazdy wpis (wcięty) to osobny wirutalny serwer
-#Konfiguracja Cowrie (SSH/TELNET)
+services: 
 
+#Konfiguracja Cowrie (SSH/TELNET)
   cowrie: 
-   image: cowrie/cowrie:latest #laduje najnowszy obraz, jesli nie ma to pobiera
-   container_name: COWRIE  #nazwa wyswietlana po wpisaniu np: docker ps
-   restart: always  #jesli sie wykrzaczy to zapewnia stablinosc 
+   image: cowrie/cowrie:latest 
+   container_name: COWRIE  
+   restart: always 
    ports: 
-    - "2222:2222" #PORT HOSTA:PORT KONTENERA SSH
-    - "2223:2223" #TELNET
+    - "2222:2222" 
+    - "2223:2223" 
+   networks:
+    honeynet:
+     ipv4_address: 172.25.0.10 
    volumes: 
-    - ./cowrie/log:/cowrie/cowrie-git/var/log/cowrie
-   #mapowanie dysku.   Sciezka_Hosta : Sciezka_Kontenera
-   #lustra, wszystko co cowrie zapisze "u siebie" pojawi sie u mnie
+      - ./cowrie_logs:/cowrie/cowrie-git/var/log/cowrie
+      - ./cowrie_downloads:/cowrie/cowrie-git/var/lib/cowrie/downloads
    deploy:
     resources:
      limits:
       cpus: '0.50'
       memory: 512M
-
+   healthcheck: 
+    test: ["CMD", "netstat", '-an', "|", "grep", "2222"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+   logging:
+    driver: "json-file"
+    options:
+      max-size: "10m"
+      max-file: "3"
+#Konfiguracja Dionaea
   dionaea:
    image: dinotools/dionaea:latest
    container_name: DIONAEA
    restart: always
    ports:
-    - "21:21" #FTP
-    - "42:42" #WINS tlumaczt adresy nazw komputerow na IP (pradziadek DNS)
-    - "135:135" #MS-RPC microsoft remote procedure call. Zdalne zarzadzanie uslugami
-    #Lewa_Strona = Prawa_Strona, wiec port na PC prowadzi do portu na Honeypocie
-    - "8445:445" #zmieniony by uniknac konfliktu z Windowsem
+    - "21:21"
+    - "42:42" 
+    - "135:135" 
+    - "8445:445" 
+    - "1433:1433"
+    - "3306:3306"
+    - "5060:5060"
+    - "5061:5061"
+   networks: 
+    honeynet:
+     ipv4_address: 172.25.0.11
    volumes: 
-   - ./dionaea/data:/opt/dionaea/var
-   #mapowanie i przechwytywanie
+   - ./dionaea_data:/opt/dionaea/var/lib/dionaea 
+   - ./dionaea_logs:/opt/dionaea/var/log/dionaea  
+  
+   healthcheck:
+    test: ["CMD-SHELL", "netstat -an | grep 445 || exit 1"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 20s
    deploy:
     resources:
      limits:
       cpus: '0.50'
       memory: 512M
-
-
-#zmiana portu 445? Oryginalny port to 445 SMB, nie jest latwo uruchomic dwie
-#na jednym porcie a Windows czesto go zajmuje na udostpenianie plikow
-#dlatego robimy przekierowanie, wada jest to ze atakujacy celuje w 8445 a nie 445
-
+   logging:
+    driver: "json-file"
+    options:
+     max-size: "100m"
+     max-file: "3"
+#Konfiguracja Real-Os
   real-os:
-   build: ./real-os #budujemy system z folderu, plik Dockerfile
+   build: ./real-os 
    container_name: REAL-OS 
    restart: always
+   privileged: true 
    ports:
-    - "2224:22" #hacker whcodzi na port 2224
+    - "2224:22" 
+   networks:
+    honeynet:
+     ipv4_address: 172.25.0.12
    volumes:
-    - ./real-os/logs:/var/log  #wyciagamy logi
+    - ./real-os/logs:/var/log  
    deploy:
     resources:
      limits: 
       cpus: "2.0"
       memory: "2G"
+   healthcheck:
+    test: ["CMD", "service", "ssh", "status"]
+    interval: 45s
+    timeout: 10s
+    retries: 3
+   logging:
+    driver: "json-file"
+    options:
+      max-size: "10m"
+      max-file: "3"
+#Konfiguracja Snort
+  snort:
+    image: linton/docker-snort:latest
+    container_name: snort
+    restart: always
+    cap_add:
+     - NET_ADMIN
+    networks:
+      honeynet:
+       ipv4_address: 172.25.0.20
+    volumes:
+      - ./snort_logs:/var/log/snort
+      - ./snort_rules/local.rules:/etc/snort/rules/local.rules
+    command: snort -q -i eth0 -A console -c /etc/snort/etc/snort.conf --pcap-filter "not port 22"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+#Wirtualny switch
+networks:
+ honeynet:
+  driver: bridge
+  ipam:
+   driver: default
+   config:
+    - subnet: 172.25.0.0/24
