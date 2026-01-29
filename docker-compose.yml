@@ -24,7 +24,7 @@ services: #kazdy wpis (wcięty) to osobny wirutalny serwer
    restart: always
    ports:
     - "21:21" #FTP
-    - "42:42" #WINS tlumaczt adresy nazw komputerow na IP (pradziadek DNS xd)
+    - "42:42" #WINS tlumaczt adresy nazw komputerow na IP (pradziadek DNS)
     - "135:135" #MS-RPC microsoft remote procedure call. Zdalne zarzadzanie uslugami
     #Lewa_Strona = Prawa_Strona, wiec port na PC prowadzi do portu na Honeypocie
     - "8445:445" #zmieniony by uniknac konfliktu z Windowsem
@@ -48,13 +48,8 @@ services: #kazdy wpis (wcięty) to osobny wirutalny serwer
    restart: always
    ports:
     - "2224:22" #hacker whcodzi na port 2224
-   #uprawnienia do Auditd
-   cap_add:
-    - AUDIT_CONTROL
-    - AUDIT_WRITE
    volumes:
     - ./real-os/logs:/var/log  #wyciagamy logi
-    
    deploy:
     resources:
      limits: 
