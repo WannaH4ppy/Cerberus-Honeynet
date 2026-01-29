@@ -1,48 +1,59 @@
 FROM ubuntu:22.04
 
 # 1. Instalacja pakietów
+# Dodajemy 'kmod' potrzebny czasem dla auditd
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y \
     openssh-server \
-    auditd \
     rsyslog \
     iproute2 \
     nano \
     && rm -rf /var/lib/apt/lists/*
 
 # 2. Konfiguracja SSH
-RUN mkdir /var/run/sshd
+# Tworzymy katalog wymagany przez SSHD (bo nie uzywamy 'service')
+RUN mkdir -p /run/sshd
 RUN echo 'root:root' | chpasswd
 RUN sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
 
-# --- NOWOŚĆ 1: Naprawa rsyslog (wyłączenie imklog) ---
-# To usuwa błąd "Operation not permitted" i pozwala rsyslogowi wstać bez marudzenia
+# --- KONFIGURACJA RSYSLOG ---
+# Wyłączamy imklog (moduł kernela, nie działa w dockerze)
 RUN sed -i '/imklog/s/^/#/' /etc/rsyslog.conf
+# Włączamy nasłuchiwanie na sockecie /dev/log (kluczowe dla komendy logger)
+RUN sed -i '/imuxsock/s/^#//' /etc/rsyslog.conf
 
-# --- NOWOŚĆ 2: Szpieg Basha (Podwójne uderzenie) ---
-# Zapisujemy pułapkę w DWÓCH miejscach. 
-# /etc/bash.bashrc - dla sesji interaktywnych SSH
-# /root/.bashrc - dla sesji roota (np. docker exec), która czasem pomija pliki systemowe
-# Zmieniono 'local6.info' na 'user.info' (pewniejsze zapisywanie do syslog)
+# --- SZPIEG BASHA ---
 RUN echo 'export PROMPT_COMMAND="history -a; logger -t HACKER_CMD -p user.info \"\$(history 1)\""' >> /etc/bash.bashrc
 RUN echo 'export PROMPT_COMMAND="history -a; logger -t HACKER_CMD -p user.info \"\$(history 1)\""' >> /root/.bashrc
 
-# 3. Tworzenie skryptu startowego
-RUN echo '#!/bin/bash\n\
-# --- TO JEST KLUCZOWE: Tworzymy plik, bo przez Volume folder jest pusty ---\n\
+# 3. Tworzenie skryptu startowego (WERSJA "DIRECT EXECUTION")
+# Omijamy komendę 'service' i uruchamiamy demony bezpośrednio.
+RUN printf '#!/bin/bash\n\
+echo "--- INICJALIZACJA KONTENERA ---"\n\
+\n\
+# 1. Naprawa uprawnień i plików logów\n\
+chown root:adm /var/log\n\
+chmod 775 /var/log\n\
 touch /var/log/syslog\n\
-chown syslog:adm /var/log/syslog\n\
-chmod 666 /var/log/syslog\n\
-# ------------------------------------------------------------------------\n\
-service rsyslog start\n\
-# Auditd może zgłaszać błędy bez pid:host, ale próbujemy go uruchomić\n\
-service auditd start || echo "Auditd failed to start but continuing..."\n\
-auditctl -w /etc/passwd -p wa -k passwd_access || true\n\
-/usr/sbin/sshd -D' > /start.sh
+touch /var/log/auth.log\n\
+\n\
+chown syslog:adm /var/log/syslog /var/log/auth.log\n\
+chmod 666 /var/log/syslog /var/log/auth.log\n\
+\n\
+# 2. Uruchamianie usług BEZPOŚREDNIO (omijamy 'service')\n\
+echo "Startuję rsyslogd..."\n\
+/usr/sbin/rsyslogd\n\
+\n\
+sleep 1\n\
+echo "Startuję sshd..."\n\
+/usr/sbin/sshd\n\
+\n\
 
-# 4. Nadanie uprawnień
+echo "--- SYSTEM GOTOWY ---"\n\
+# 4. Utrzymanie kontenera przy życiu\n\
+tail -f /var/log/syslog\n' > /start.sh
+
+# 4. Start
 RUN chmod +x /start.sh
 EXPOSE 22
-
-# 5. Start
 CMD ["/start.sh"]
