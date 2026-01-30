@@ -94,20 +94,20 @@ services:
     options:
       max-size: "10m"
       max-file: "3"
-#Konfiguracja Snort
+#Konfiguracja Snort NIDS
   snort:
     image: linton/docker-snort:latest
     container_name: snort
     restart: always
+    network_mode: "host"
     cap_add:
-     - NET_ADMIN
-    networks:
-      honeynet:
-       ipv4_address: 172.25.0.20
+     - NET_ADMIN #capability
     volumes:
       - ./snort_logs:/var/log/snort
       - ./snort_rules/local.rules:/etc/snort/rules/local.rules
-    command: snort -q -i eth0 -A console -c /etc/snort/etc/snort.conf --pcap-filter "not port 22"
+    #-q (quiet) i- eth0 (interface) -A console (list attacks) -c ....conf (path to config file) --pcap-filter (ignore
+    #all traffic at port 22, because its our local connection, we have 2222)
+    command: snort -A console -q -c /etc/snort/etc/snort.conf -i bridge-honeypot
     deploy:
       resources:
         limits:
@@ -121,8 +121,10 @@ services:
 #Wirtualny switch
 networks:
  honeynet:
-  driver: bridge
-  ipam:
+  driver: bridge #virtual switch
+  driver_opts:
+    com.docker.network.bridge.name: bridge-honeypot #NAZWA KARTY SIECIOWEJ dla snorta
+  ipam: #IP Address Management (use standard addresation)
    driver: default
    config:
-    - subnet: 172.25.0.0/24
+    - subnet: 172.25.0.0/24 #range from 172.25.0.1 - 172.25.0.254
