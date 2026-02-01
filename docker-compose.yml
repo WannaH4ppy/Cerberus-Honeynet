@@ -19,11 +19,6 @@ services:
      limits:
       cpus: '0.50'
       memory: 512M
-   healthcheck: 
-    test: ["CMD", "netstat", '-an', "|", "grep", "2222"]
-    interval: 30s
-    timeout: 10s
-    retries: 3
    logging:
     driver: "json-file"
     options:
@@ -49,13 +44,6 @@ services:
    volumes: 
    - ./dionaea_data:/opt/dionaea/var/lib/dionaea 
    - ./dionaea_logs:/opt/dionaea/var/log/dionaea  
-  
-   healthcheck:
-    test: ["CMD-SHELL", "netstat -an | grep 445 || exit 1"]
-    interval: 30s
-    timeout: 10s
-    retries: 3
-    start_period: 20s
    deploy:
     resources:
      limits:
