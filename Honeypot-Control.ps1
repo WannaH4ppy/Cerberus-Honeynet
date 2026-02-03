@@ -8,7 +8,7 @@ if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]:
 function Start-Honey {
     Write-Host "--- Uruchamianie Honeypota ---" -ForegroundColor Cyan
     wsl -d Ubuntu --cd ~/Honeypot -e docker compose up -d
-    Write-Host "Gotowe. Wciśnij DOWOLNY klawisz by wrocic"
+    Write-Host "Gotowe. Wcisnij DOWOLNY klawisz by wrocic"
 }
 
 function Stop-Honey {
@@ -17,6 +17,12 @@ function Stop-Honey {
 }
 
 function Reload-Honey {
+    Write-Host "--- Usuniecie Kontenerow ---" -ForegroundColor Cyan
+    wsl -d Ubuntu --cd ~/Honeypot -e docker compose restart
+    Write-Host "GOTOWE, SRODOWISKO PRZELADOWANE" -ForegroundColor Green
+}
+
+function Reload-HoneyADV {
     Write-Host "--- Usuniecie Kontenerow ---" -ForegroundColor Cyan
     wsl -d Ubuntu --cd ~/Honeypot -e docker compose down
     Write-Host "--- Czyszczenie Pamieci ---" -ForegroundColor Cyan
@@ -27,6 +33,11 @@ function Reload-Honey {
     Write-Host "GOTOWE, SRODOWISKO PRZELADOWANE" -ForegroundColor Green
 }
 
+function Real-OS {
+    Write-Host "--- Inicjalizacja Honeypota --- " -ForegroundColor Cyan
+    wsl -d Ubuntu --cd ~/Honeypot -e docker exec -it REAL-OS /bin/bash
+
+}
 
 function LabOn {
     Write-Host "--- LAB ON: Izolacja + Statyczne IP ---" -ForegroundColor Yellow
@@ -79,7 +90,12 @@ function LabOff {
 
 function Show-Honey {
     Write-Host "--- Stan Kontenerow ---" -ForegroundColor Cyan
-    wsl -d Ubuntu --cd ~/Honeypot -e docker compose ps
+    wsl -d Ubuntu --cd ~/Honeypot -e docker compose ps --services --filter "status=running"
+}
+
+function Show-HoneyADV {
+    Write-Host "--- Zaawansowane informacje o stanie Kontenerow" -ForegroundColor Cyan
+    wsl -d Ubuntu --cd ~/Honeypot -e docker compose ps 
 }
 
 do {
@@ -96,13 +112,19 @@ do {
     Write-Host " [2] Stop-Honey" -ForegroundColor Yellow -NoNewline     
     Write-Host "       - Zatrzymuje i usuwa kontenery"
     Write-Host " [3] Reload-Honey"   -ForegroundColor Yellow -NoNewline
-    Write-Host "     - Przebudowuje od zera"
-    Write-Host " [4] Show-Honey "    -ForegroundColor Yellow -NoNewline
-    Write-Host "      - Pokazuje status (docker ps)"
-    Write-Host " [5] Lab-ON "        -ForegroundColor Yellow -NoNewline
+    Write-Host "     - Szybki restart"
+    Write-Host " [4] Reload-HoneyADV" -ForegroundColor Yellow -NoNewline
+    Write-Host "  - Przebudowuje od zera"
+    Write-Host " [5] Show-Honey "    -ForegroundColor Yellow -NoNewline
+    Write-Host "      - Pokazuje uruchomione honeypoty"
+    Write-Host " [6] Show-Honey+ "   -ForegroundColor Yellow -NoNewline
+    Write-Host "     - Pokazuje szczegolowy status"
+    Write-Host " [7] Lab-ON "        -ForegroundColor Yellow -NoNewline
     Write-Host "          - Uruchamia tryb laboratoryjny (OFFLINE)"
-    Write-Host " [6] Lab-OFF  "     -ForegroundColor Yellow -NoNewline 
+    Write-Host " [8] Lab-OFF  "     -ForegroundColor Yellow -NoNewline 
     Write-Host "        - Wylacza tryb laboratoryjny (ONLINE)"
+    Write-Host " [9] Real-OS  "     -ForegroundColor Yellow -NoNewline 
+    Write-Host "        - Zarzadzanie honeypotem REAL-OS"
     Write-Host " [q] Wyjscie" -ForegroundColor Yellow
     Write-Host "==================================================================" -ForegroundColor Cyan
 
@@ -112,9 +134,12 @@ do {
         '1' { Start-Honey; Pause }
         '2' { Stop-Honey; Pause }
         '3' { Reload-Honey; Pause }
-        '4' { Show-Honey; Pause }
-        '5' { LabON; Pause }
-        '6' { LabOFF; Pause }
+        '4' { Reload-HoneyADV; Pause}
+        '5' { Show-Honey; Pause }
+        '6' { Show-HoneyADV; Pause}
+        '7' { LabON; Pause }
+        '8' { LabOFF; Pause }
+        '9' {Real-OS; Pause}
         'q' { Write-Host "Do zobaczenia... "; break }
         Default { Write-Host "Nie ma takiej opcji." -ForegroundColor Red; Start-Sleep -Seconds 1 }
     }
