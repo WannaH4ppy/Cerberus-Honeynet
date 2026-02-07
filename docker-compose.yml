@@ -93,8 +93,7 @@ services:
     volumes:
       - ./snort_logs:/var/log/snort
       - ./snort_rules/local.rules:/etc/snort/rules/local.rules
-    #-q (quiet) i- eth0 (interface) -A console (list attacks) -c ....conf (path to config file) --pcap-filter (ignore
-    #all traffic at port 22, because its our local connection, we have 2222)
+
     command: snort -A console -q -c /etc/snort/etc/snort.conf -i bridge-honeypot
     deploy:
       resources:
@@ -106,6 +105,64 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+#Portainer 
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    restart: always
+    ports:
+      - "9000:9000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+    networks:
+      - honeynet
+
+#Promtail 
+  promtail:
+    image: grafana/promtail:latest
+    user: "0"                
+    container_name: promtail
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - ./config/promtail-config.yaml:/etc/promtail/config.yaml
+    command: -config.file=/etc/promtail/config.yaml
+    networks:
+      - honeynet
+
+#Loki 
+  loki:
+    image: grafana/loki:latest
+    user: "0"
+    container_name: loki
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./config/loki-config.yaml:/etc/loki/local-config.yaml
+    networks:
+      - honeynet
+
+#Grafana 
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin  # Hasło startowe (zmienisz je po zalogowaniu)
+      - GF_USERS_ALLOW_SIGN_UP=false
+    networks:
+      - honeynet
+    depends_on:
+      - loki
+        
 #Wirtualny switch
 networks:
  honeynet:
@@ -116,3 +173,6 @@ networks:
    driver: default
    config:
     - subnet: 172.25.0.0/24 #range from 172.25.0.1 - 172.25.0.254
+
+volumes:
+  portainer_data:
