@@ -1,6 +1,6 @@
 services: 
 
-#Konfiguracja Cowrie (SSH/TELNET)
+#Cowrie 
   cowrie: 
    image: cowrie/cowrie:latest 
    container_name: COWRIE  
@@ -24,7 +24,7 @@ services:
     options:
       max-size: "10m"
       max-file: "3"
-#Konfiguracja Dionaea
+#Dionaea
   dionaea:
    image: dinotools/dionaea:latest
    container_name: DIONAEA
@@ -34,7 +34,7 @@ services:
     - "42:42" 
     - "135:135" 
     - "8445:445" 
-    - "1433:1433"
+    - "14333:1433"
     - "3306:3306"
     - "5060:5060"
     - "5061:5061"
@@ -54,7 +54,7 @@ services:
     options:
      max-size: "100m"
      max-file: "3"
-#Konfiguracja Real-Os
+#Real-Os
   real-os:
    build: ./real-os 
    container_name: REAL-OS 
@@ -82,7 +82,7 @@ services:
     options:
       max-size: "10m"
       max-file: "3"
-#Konfiguracja Snort NIDS
+#Snort
   snort:
     image: linton/docker-snort:latest
     container_name: snort
@@ -94,7 +94,7 @@ services:
       - ./snort_logs:/var/log/snort
       - ./snort_rules/local.rules:/etc/snort/rules/local.rules
 
-    command: snort -A console -q -c /etc/snort/etc/snort.conf -i bridge-honeypot
+    command: snort -A fast -q -c /etc/snort/etc/snort.conf -i bridge-honeypot
     deploy:
       resources:
         limits:
@@ -122,16 +122,18 @@ services:
 #Promtail 
   promtail:
     image: grafana/promtail:latest
-    user: "0"                
     container_name: promtail
-    restart: unless-stopped
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
-      - ./config/promtail-config.yaml:/etc/promtail/config.yaml
+      - ./config/promtail-config.yaml:/etc/promtail/config.yaml:ro
+      - ./cowrie_logs:/var/log/cowrie:ro
+      - ./dionaea_logs:/var/log/dionaea:ro
+      - ./snort_logs:/var/log/snort:ro
+      - ./real-os/logs:/var/log/real-os:ro
     command: -config.file=/etc/promtail/config.yaml
     networks:
       - honeynet
+    depends_on:
+      - loki
 
 #Loki 
   loki:
@@ -154,6 +156,8 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin  # Hasło startowe (zmienisz je po zalogowaniu)
@@ -176,3 +180,4 @@ networks:
 
 volumes:
   portainer_data:
+  grafana_data:
