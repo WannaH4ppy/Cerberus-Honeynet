@@ -1,0 +1,43 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: cowrie
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: cowrie
+          __path__: /var/log/cowrie/cowrie.json
+
+  - job_name: dionaea
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: dionaea
+          __path__: /var/log/dionaea/*.log
+          
+
+  - job_name: snort
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: snort
+          __path__: /var/log/snort/alert
+          
+  - job_name: real-os
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: real-os
+          __path__: /var/log/real-os/auth.log
