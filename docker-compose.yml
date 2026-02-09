@@ -1,6 +1,6 @@
 services: 
 
-#Cowrie 
+#Konfiguracja Cowrie (SSH/TELNET)
   cowrie: 
    image: cowrie/cowrie:latest 
    container_name: COWRIE  
@@ -24,7 +24,7 @@ services:
     options:
       max-size: "10m"
       max-file: "3"
-#Dionaea
+#Konfiguracja Dionaea
   dionaea:
    image: dinotools/dionaea:latest
    container_name: DIONAEA
@@ -54,7 +54,7 @@ services:
     options:
      max-size: "100m"
      max-file: "3"
-#Real-Os
+#Konfiguracja Real-Os
   real-os:
    build: ./real-os 
    container_name: REAL-OS 
@@ -82,7 +82,7 @@ services:
     options:
       max-size: "10m"
       max-file: "3"
-#Snort
+#Konfiguracja Snort NIDS
   snort:
     image: linton/docker-snort:latest
     container_name: snort
@@ -94,7 +94,7 @@ services:
       - ./snort_logs:/var/log/snort
       - ./snort_rules/local.rules:/etc/snort/rules/local.rules
 
-    command: snort -A fast -q -c /etc/snort/etc/snort.conf -i bridge-honeypot
+    command: snort -A fast -q -c /etc/snort/etc/snort.conf -i bridge-honeypot -k none
     deploy:
       resources:
         limits:
