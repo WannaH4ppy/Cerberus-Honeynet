@@ -40,4 +40,4 @@ scrape_configs:
           - localhost
         labels:
           job: real-os
-          __path__: /var/log/real-os/auth.log
+          __path__: /var/log/real-os/{auth.log,syslog,.hacker_history}
