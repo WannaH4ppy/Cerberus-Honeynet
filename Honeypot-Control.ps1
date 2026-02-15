@@ -145,3 +145,4 @@ do {
     }
 
 } while ($wybor -ne 'q')
+
