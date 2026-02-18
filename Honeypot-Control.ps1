@@ -5,9 +5,78 @@ if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]:
     Exit
 }
 
+
+function Fix-Port-Reservations {
+    Write-Host "--- Sprawdzanie rezerwacji portow ---" -ForegroundColor Cyan
+
+    $myPorts = @(22, 23, 80, 1445, 1433, 2222, 3000, 3100, 3306, 9000)
+    
+    #Out-String zamienia listę linii na jeden blok tekstu
+    $currentExclusions = netsh interface ipv4 show excludedportrange protocol=tcp | Out-String
+    $toAdd = @()
+
+    foreach ($port in $myPorts) {
+        # Precyzyjniejsze szukanie (port na początku linii + spacje)
+        # (?m) włącza tryb wielolinijkowy, ^ to początek linii
+        if ($currentExclusions -notmatch "(?m)^\s*$port\s") {
+            $toAdd += $port
+        }
+    }
+
+    if ($toAdd.Count -gt 0) {
+        Write-Host "Brakuje rezerwacji dla: $($toAdd -join ', '). Naprawiam..." -ForegroundColor Yellow
+        # 1. Zatrzymujemy winnat
+        Stop-Service winnat -Force -ErrorAction SilentlyContinue
+        # 2. CZEKAMY
+        Start-Sleep -Seconds 3 
+
+        foreach ($port in $toAdd) {
+            # Dodajemy rezerwację
+            netsh int ipv4 add excludedportrange protocol=tcp startport=$port numberofports=1 store=persistent 2>$null
+        }
+
+        # 3. Przywracamy sieć
+        Start-Service winnat
+        Write-Host "Porty zostaly zarezerwowane pomyslnie." -ForegroundColor Green
+    } else {
+        Write-Host "Wszystkie porty sa juz bezpieczne." -ForegroundColor Green
+    }
+}
+
+function Test-HoneyHealth {
+    Write-Host "`n--- [WERYFIKACJA] Sprawdzanie dostepnosci uslug ---" -ForegroundColor Cyan
+    $portsToTest = @(
+        @{Port=22;   Name="Cowrie SSH"};
+        @{Port=21;   Name="Dionaea FTP"};
+        @{Port=42;   Name="Dionaea HNS"};
+        @{Port=80;   Name="Dionaea HTTP"};
+        @{Port=135; Name="Dionaea RPC"};
+        @{Port=1445;   Name="Dionaea SMB"};
+        @{Port=1433;   Name="Dionaea MSQL"};
+        @{Port=2222;   Name="Real-OS SSH"};
+        @{Port=3306; Name="Dionaea MySQL"};
+        @{Port=3000; Name="Grafana UI"};
+        @{Port=9000; Name="Portainer UI"}
+    )
+
+    foreach ($service in $portsToTest) {
+        $check = Test-NetConnection -ComputerName localhost -Port $service.Port -InformationLevel Quiet
+        if ($check) {
+            Write-Host " [OK] " -NoNewline -ForegroundColor Green
+            Write-Host "$($service.Name) (Port $($service.Port)) odpowiada."
+        } else {
+            Write-Host " [!!] " -NoNewline -ForegroundColor Red
+            Write-Host "$($service.Name) (Port $($service.Port)) NIE ODPOWIADA!" -ForegroundColor Red
+        }
+    }
+}
+
 function Start-Honey {
+    
+    Fix-Port-Reservations
     Write-Host "--- Uruchamianie Honeypota ---" -ForegroundColor Cyan
     wsl -d Ubuntu --cd ~/Honeypot -e docker compose up -d
+    Test-HoneyHealth
     Write-Host "Gotowe. Wcisnij DOWOLNY klawisz by wrocic"
 }
 
@@ -145,4 +214,5 @@ do {
     }
 
 } while ($wybor -ne 'q')
+
 
