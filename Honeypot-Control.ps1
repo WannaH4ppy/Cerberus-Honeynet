@@ -9,7 +9,7 @@ if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]:
 function Fix-Port-Reservations {
     Write-Host "--- Sprawdzanie rezerwacji portow ---" -ForegroundColor Cyan
 
-    $myPorts = @(22, 23, 80, 1445, 1433, 2222, 3000, 3100, 3306, 9000)
+    $myPorts = @(21, 22, 23, 80, 1445, 1433, 2222, 3000, 3100, 3306, 9000)
     
     #Out-String zamienia listę linii na jeden blok tekstu
     $currentExclusions = netsh interface ipv4 show excludedportrange protocol=tcp | Out-String
@@ -51,8 +51,6 @@ function Test-HoneyHealth {
         @{Port=42;   Name="Dionaea HNS"};
         @{Port=80;   Name="Dionaea HTTP"};
         @{Port=135; Name="Dionaea RPC"};
-        @{Port=1445;   Name="Dionaea SMB"};
-        @{Port=1433;   Name="Dionaea MSQL"};
         @{Port=2222;   Name="Real-OS SSH"};
         @{Port=3306; Name="Dionaea MySQL"};
         @{Port=3000; Name="Grafana UI"};
@@ -60,7 +58,7 @@ function Test-HoneyHealth {
     )
 
     foreach ($service in $portsToTest) {
-        $check = Test-NetConnection -ComputerName localhost -Port $service.Port -InformationLevel Quiet
+        $check = Test-NetConnection -ComputerName 127.0.0.1 -Port $service.Port -InformationLevel Quiet -WarningAction SilentlyContinue
         if ($check) {
             Write-Host " [OK] " -NoNewline -ForegroundColor Green
             Write-Host "$($service.Name) (Port $($service.Port)) odpowiada."
@@ -76,6 +74,8 @@ function Start-Honey {
     Fix-Port-Reservations
     Write-Host "--- Uruchamianie Honeypota ---" -ForegroundColor Cyan
     wsl -d Ubuntu --cd ~/Honeypot -e docker compose up -d
+    Write-Host "--- Uruchomienie uslug ---" -ForegroundColor Cyan
+    Start-Sleep -Seconds 20
     Test-HoneyHealth
     Write-Host "Gotowe. Wcisnij DOWOLNY klawisz by wrocic"
 }
