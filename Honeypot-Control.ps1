@@ -209,10 +209,11 @@ do {
         '7' { LabON; Pause }
         '8' { LabOFF; Pause }
         '9' {Real-OS; Pause}
-        'q' { Write-Host "Do zobaczenia... "; break }
+        'q' { Write-Host "Koniec programu"; break }
         Default { Write-Host "Nie ma takiej opcji." -ForegroundColor Red; Start-Sleep -Seconds 1 }
     }
 
 } while ($wybor -ne 'q')
+
 
 
