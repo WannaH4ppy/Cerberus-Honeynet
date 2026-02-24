@@ -1,0 +1,7 @@
+[wsl2]
+memory=4GB
+processors=2
+swap=4GB
+networkingMode=mirroreddns
+Tunneling=true
+firewall=true
