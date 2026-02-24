@@ -154,7 +154,7 @@ function LabOff {
     Write-Host " [4/4] Restart sterownika karty..." -NoNewline
     Restart-NetAdapter -Name "Ethernet" -Confirm:$false -ErrorAction SilentlyContinue
     Write-Host " OK." -ForegroundColor Green
-    Write-Host "--- INTERNET PRZYWROCONY ---" -ForegroundColor Green
+    Write-Host "--- INTERNET PRZYWROCONY ---" -ForegroundColor Red
 }
 
 function Show-Honey {
@@ -214,6 +214,7 @@ do {
     }
 
 } while ($wybor -ne 'q')
+
 
 
 
