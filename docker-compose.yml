@@ -6,11 +6,13 @@ services:
    container_name: COWRIE  
    restart: always 
    ports: 
-    - "2222:2222" 
-    - "2223:2223" 
+    - "22:2222" 
+    - "23:2223" 
    networks:
-    honeynet:
+    dmtzed:
      ipv4_address: 172.25.0.10 
+   environment:
+      - COWRIE_TELNET_ENABLED=yes
    volumes: 
       - ./cowrie_logs:/cowrie/cowrie-git/var/log/cowrie
       - ./cowrie_downloads:/cowrie/cowrie-git/var/lib/cowrie/downloads
@@ -32,14 +34,16 @@ services:
    ports:
     - "21:21"
     - "42:42" 
+    - "80:80"
     - "135:135" 
-    - "8445:445" 
-    - "14333:1433"
+    - "1445:445" 
+    - "1433:1433"
     - "3306:3306"
     - "5060:5060"
     - "5061:5061"
+
    networks: 
-    honeynet:
+    dmtzed:
      ipv4_address: 172.25.0.11
    volumes: 
    - ./dionaea_data:/opt/dionaea/var/lib/dionaea 
@@ -59,11 +63,12 @@ services:
    build: ./real-os 
    container_name: REAL-OS 
    restart: always
-   privileged: true 
    ports:
-    - "2224:22" 
+    - "2222:22" 
+   environment:
+    - SSH_PORT=22
    networks:
-    honeynet:
+    dmtzed:
      ipv4_address: 172.25.0.12
    volumes:
     - ./real-os/logs:/var/log  
@@ -94,7 +99,7 @@ services:
       - ./snort_logs:/var/log/snort
       - ./snort_rules/local.rules:/etc/snort/rules/local.rules
 
-    command: snort -A fast -q -c /etc/snort/etc/snort.conf -i bridge-honeypot -k none
+    command: snort -A fast -q -c /etc/snort/etc/snort.conf -i bridge-dmtzed -k none
     deploy:
       resources:
         limits:
@@ -117,7 +122,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - portainer_data:/data
     networks:
-      - honeynet
+      - magmt
 
 #Promtail 
   promtail:
@@ -131,7 +136,7 @@ services:
       - ./real-os/logs:/var/log/real-os:ro
     command: -config.file=/etc/promtail/config.yaml
     networks:
-      - honeynet
+      - magmt
     depends_on:
       - loki
 
@@ -147,7 +152,7 @@ services:
     volumes:
       - ./config/loki-config.yaml:/etc/loki/local-config.yaml
     networks:
-      - honeynet
+      - magmt
 
 #Grafana 
   grafana:
@@ -160,23 +165,37 @@ services:
       - grafana_data:/var/lib/grafana
     environment:
       - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin  # Hasło startowe (zmienisz je po zalogowaniu)
+      - GF_SECURITY_ADMIN_PASSWORD=admin  # Hasło startowe
       - GF_USERS_ALLOW_SIGN_UP=false
     networks:
-      - honeynet
+      - magmt
     depends_on:
       - loki
+  fake-server:
+    image: alpine:latest
+    command: tail -f /dev/null
+    networks:
+      dmtzed:
+        ipv4_address: 172.25.0.250
         
 #Wirtualny switch
 networks:
- honeynet:
+ dmtzed:
   driver: bridge #virtual switch
   driver_opts:
-    com.docker.network.bridge.name: bridge-honeypot #NAZWA KARTY SIECIOWEJ dla snorta
-  ipam: #IP Address Management (use standard addresation)
+    com.docker.network.bridge.name: bridge-dmtzed #NAZWA KARTY SIECIOWEJ dla snorta
+  ipam: 
    driver: default
    config:
     - subnet: 172.25.0.0/24 #range from 172.25.0.1 - 172.25.0.254
+ magmt:
+  driver: bridge #virtual for mgmt
+  driver_opts:
+    com.docker.network.bridge.name: bridge-magmt #NAZWA dla 
+  ipam:
+    driver: default
+    config:
+      - subnet: 172.26.0.0/24
 
 volumes:
   portainer_data:
