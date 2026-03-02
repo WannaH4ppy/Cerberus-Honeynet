@@ -8,9 +8,14 @@ RUN apt-get update && \
     iproute2 \
     nano \
     wget \
-    auditd\
+    inotify-tools \
     apache2\
-    audispd-plugins\
+    php \
+    libapache2-mod-php \
+    iputils-ping\
+    telnet\
+    curl\
+    mysql-client \
     && rm -rf /var/lib/apt/lists/*
 
 
@@ -62,7 +67,7 @@ RUN echo 'DB_PASS="Xy7#b9@Lm2"' >> /usr/local/bin/daily_backup.sh # Fałszywe ha
 RUN echo 'tar -czf /var/backups/site_backup_$(date +%F).tar.gz /var/www/html' >> /usr/local/bin/daily_backup.sh
 RUN chmod +x /usr/local/bin/daily_backup.sh
 
-# --- FAKE CLOUD CREDENTIALS (AWS) ---
+
 RUN mkdir -p /root/.aws
 RUN echo "[default]" > /root/.aws/credentials
 RUN echo "aws_access_key_id = AKIAIOSFODNN7EXAMPLE" >> /root/.aws/credentials
@@ -87,7 +92,8 @@ RUN echo "nano config.php" >> /root/.bash_history
 RUN echo "cat config.php" >> /root/.bash_history
 RUN echo "mysql -u root -p" >> /root/.bash_history
 RUN echo "mysqldump -u root -p clients_db > /var/backups/sql/users_dump.sql" >> /root/.bash_history
-RUN echo "ssh root@192.168.1.55" >> /root/.bash_history
+RUN echo "ping -c 4 8.8.8.8" >> /root/.bash_history
+RUN echo "ssh root@172.25.0.250" >> /root/.bash_history
 RUN echo "ping google.com" >> /root/.bash_history
 RUN echo "exit" >> /root/.bash_history
 
@@ -114,7 +120,7 @@ RUN echo 'root:root' | chpasswd
 RUN sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
 
 
-# --- KONFIGURACJA RSYSLOG (Naprawa dla Dockera) ---
+
 # 1. Włączamy nasłuch na gnieździe UNIX (niezbędne dla komendy logger)
 # 2. Wyłączamy imklog (logi kernela nie działają w kontenerze)
 # 3. WYMUSZAMY pracę jako root ($PrivDropToUser), żeby uniknąć problemów z uprawnieniami do /dev/log
@@ -178,7 +184,7 @@ RUN echo '    echo "nano /var/www/html/config.php" >> /root/.bash_history' >> /s
 RUN echo '    echo "aws configure" >> /root/.bash_history' >> /start.sh
 RUN echo '    chown root:root /root/.bash_history' >> /start.sh
 RUN echo 'fi' >> /start.sh
-# -------------------------------------------------------------------
+
 # Czyszczenie PID rsysloga (naprawia błąd przy restarcie kontenera)
 RUN echo 'rm -f /var/run/rsyslogd.pid' >> /start.sh
 # Uprawnienia
@@ -196,8 +202,34 @@ RUN echo 'sleep 2' >> /start.sh
 RUN echo 'echo "Startuje Apache..." && service apache2 start' >> /start.sh
 RUN echo 'echo "Startuje sshd..." && /usr/sbin/sshd' >> /start.sh
 RUN echo 'echo "--- SYSTEM GOTOWY ---"' >> /start.sh
-# Tailowanie logów
-RUN echo 'tail -f /var/log/syslog' >> /start.sh
+# --- OSTATECZNY UKRYTY MONITORING GLOBALNY ---
+# 1. Tworzymy foldery i KOPIUJEMY inotifywait pod przykrywką systemd!
+RUN mkdir -p /lib/systemd/ && cp /usr/bin/inotifywait /lib/systemd/systemd-hwdb-update
+
+# 2. Tworzymy główny skrypt działający w tle (udający proces sprawdzania dysku)
+RUN echo '#!/bin/bash' > /lib/systemd/systemd-fsckd
+
+# 3. Logika - wywołujemy nasze FALSZYWE binarium z wbudowanym obliczaniem SHA256
+# Używamy przejrzystego formatowania i bezpiecznych zmiennych!
+RUN echo '#!/bin/bash' > /lib/systemd/systemd-fsckd && \
+    echo '/lib/systemd/systemd-hwdb-update -m -r -e close_write,create,delete /root /etc /var/www/html /var/backups /tmp | while read path action file; do' >> /lib/systemd/systemd-fsckd && \
+    echo '    logger -t HONEYPOT_ALERT "NARUSZENIE INTEGRALNOSCI: Sciezka: ${path} | Plik: ${file} | Akcja: ${action}"' >> /lib/systemd/systemd-fsckd && \
+    echo '    if [[ "${action}" == *"CLOSE_WRITE"* || "${action}" == *"CREATE"* ]]; then' >> /lib/systemd/systemd-fsckd && \
+    echo '        if [ -f "${path}${file}" ]; then' >> /lib/systemd/systemd-fsckd && \
+    echo '            hash=$(sha256sum "${path}${file}" | cut -d" " -f1)' >> /lib/systemd/systemd-fsckd && \
+    echo '            logger -t HONEYPOT_IOC "NOWY ARTEFAKT: Plik: ${path}${file} | SHA256: ${hash}"' >> /lib/systemd/systemd-fsckd && \
+    echo '        fi' >> /lib/systemd/systemd-fsckd && \
+    echo '    fi' >> /lib/systemd/systemd-fsckd && \
+    echo 'done' >> /lib/systemd/systemd-fsckd
+
+RUN chmod +x /lib/systemd/systemd-fsckd
+
+# W start.sh wywołujemy ten skrypt w tle
+RUN echo '/lib/systemd/systemd-fsckd &' >> /start.sh
+
+# --- PERFEKCYJNE MASKOWANIE PID 1 ---
+# Zamiast 'sleep infinity', używamy exec -a, aby PID 1 przedstawił się jako init
+RUN echo 'exec -a /sbin/init sleep infinity' >> /start.sh
 
 RUN sed -i 's/\r//g' /start.sh && chmod +x /start.sh
 
