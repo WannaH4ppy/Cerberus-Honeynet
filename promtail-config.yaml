@@ -9,7 +9,9 @@ clients:
   - url: http://loki:3100/loki/api/v1/push
 
 scrape_configs:
-  # COWRIE - Wyciąganie danych z formatu JSON
+ 
+  # COWRIE
+ 
   - job_name: cowrie
     static_configs:
       - targets:
@@ -26,28 +28,98 @@ scrape_configs:
           attacker_ip: extracted_ip
           action: event_action
 
-  # REAL-OS - Wyciąganie danych z surowego tekstu (Regex)
+      # DYNAMICZNE TAGOWANIE COWRIE
+      - match:
+          selector: '{job="cowrie", action=~".*login.*"}'
+          stages:
+            - template:
+                source: tmp_tactic
+                template: "Credential_Access"
+            - template:
+                source: tmp_technique
+                template: "T1110_Brute_Force"
+            - labels:
+                mitre_tactic: tmp_tactic
+                mitre_technique: tmp_technique
+
+      - match:
+          selector: '{job="cowrie", action=~".*command.*"}'
+          stages:
+            - template:
+                source: tmp_tactic
+                template: "Execution"
+            - template:
+                source: tmp_technique
+                template: "T1059_Command_Interpreter"
+            - labels:
+                mitre_tactic: tmp_tactic
+                mitre_technique: tmp_technique
+
+
+  # REAL-OS
+
   - job_name: real-os
     static_configs:
       - targets:
           - localhost
         labels:
           job: real-os
-          # POPRAWKA 1: Promtail teraz czyta WSZYSTKIE pliki w tym folderze, w tym syslog i auth.log!
           __path__: /var/log/real-os/*
     pipeline_stages:
       - regex:
           expression: '.*sshd\[\d+\]:.*(Accepted|Failed|Invalid) \w+ for (invalid user )?(?P<user>\w+)? from (?P<extracted_ip>\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'
-      
-      # POPRAWKA 2: Regex używający \b (granicy słowa) zamiast twardej spacji
       - regex:
           expression: '.*HACKER_CMD.*?(?P<c2_ip>\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b)'
-      
+      - regex:
+          expression: '(?P<event_type>sshd|HACKER_CMD|HONEYPOT_IOC)'
       - labels:
           attacker_ip: extracted_ip
           malicious_target_ip: c2_ip
+          event_type: event_type
 
-  # DIONAEA i SNORT
+      # DYNAMICZNE TAGOWANIE REAL-OS
+      - match:
+          selector: '{job="real-os", event_type="sshd"}'
+          stages:
+            - template:
+                source: tmp_tactic
+                template: "Credential_Access"
+            - template:
+                source: tmp_technique
+                template: "T1110_Brute_Force"
+            - labels:
+                mitre_tactic: tmp_tactic
+                mitre_technique: tmp_technique
+
+      - match:
+          selector: '{job="real-os", event_type="HACKER_CMD"}'
+          stages:
+            - template:
+                source: tmp_tactic
+                template: "Execution"
+            - template:
+                source: tmp_technique
+                template: "T1059_Command_Interpreter"
+            - labels:
+                mitre_tactic: tmp_tactic
+                mitre_technique: tmp_technique
+
+      - match:
+          selector: '{job="real-os", event_type="HONEYPOT_IOC"}'
+          stages:
+            - template:
+                source: tmp_tactic
+                template: "Command_and_Control"
+            - template:
+                source: tmp_technique
+                template: "T1105_Ingress_Tool_Transfer"
+            - labels:
+                mitre_tactic: tmp_tactic
+                mitre_technique: tmp_technique
+
+ 
+  # DIONAEA
+
   - job_name: dionaea
     static_configs:
       - targets:
@@ -55,11 +127,78 @@ scrape_configs:
         labels:
           job: dionaea
           __path__: /var/log/dionaea/*.log
+    pipeline_stages:
+      - regex:
+          expression: '(?i)(?P<event_type>connection|download|accept|file)'
+      - labels:
+          event_type: event_type
 
+      # DYNAMICZNE TAGOWANIE DIONAEA
+      - match:
+          selector: '{job="dionaea", event_type="connection"}'
+          stages:
+            - template:
+                source: tmp_tactic
+                template: "Initial_Access"
+            - template:
+                source: tmp_technique
+                template: "T1190_Exploit_Public_App"
+            - labels:
+                mitre_tactic: tmp_tactic
+                mitre_technique: tmp_technique
+
+      - match:
+          selector: '{job="dionaea", event_type=~"download|accept|file"}'
+          stages:
+            - template:
+                source: tmp_tactic
+                template: "Command_and_Control"
+            - template:
+                source: tmp_technique
+                template: "T1105_Ingress_Tool_Transfer"
+            - labels:
+                mitre_tactic: tmp_tactic
+                mitre_technique: tmp_technique
+
+
+  # SNORT
+  
   - job_name: snort
     static_configs:
       - targets:
           - localhost
         labels:
           job: snort
-          __path__: /var/log/snort/alert
+          __path__: /var/log/snort/alert*
+    pipeline_stages:
+      - regex:
+          expression: '(?i)(?P<event_type>scan|nmap|icmp|exploit|malware|attack)'
+      - labels:
+          event_type: event_type
+
+      # DYNAMICZNE TAGOWANIE SNORT
+      - match:
+          selector: '{job="snort", event_type=~"scan|nmap|icmp"}'
+          stages:
+            - template:
+                source: tmp_tactic
+                template: "Discovery"
+            - template:
+                source: tmp_technique
+                template: "T1046_Network_Service_Scanning"
+            - labels:
+                mitre_tactic: tmp_tactic
+                mitre_technique: tmp_technique
+
+      - match:
+          selector: '{job="snort", event_type=~"exploit|malware|attack"}'
+          stages:
+            - template:
+                source: tmp_tactic
+                template: "Initial_Access"
+            - template:
+                source: tmp_technique
+                template: "T1190_Exploit_Public_App"
+            - labels:
+                mitre_tactic: tmp_tactic
+                mitre_technique: tmp_technique
