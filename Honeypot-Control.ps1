@@ -11,13 +11,13 @@ function Fix-Port-Reservations {
 
     $myPorts = @(21, 22, 23, 80, 1445, 1433, 2222, 3000, 3100, 3306, 9000)
     
-    #Out-String zamienia listę linii na jeden blok tekstu
+    #Out-String zamienia liste linii na jeden blok tekstu
     $currentExclusions = netsh interface ipv4 show excludedportrange protocol=tcp | Out-String
     $toAdd = @()
 
     foreach ($port in $myPorts) {
-        # Precyzyjniejsze szukanie (port na początku linii + spacje)
-        # (?m) włącza tryb wielolinijkowy, ^ to początek linii
+        # Precyzyjniejsze szukanie (port na poczatku linii + spacje)
+        # (?m) wlacza tryb wielolinijkowy, ^ to poczatek linii
         if ($currentExclusions -notmatch "(?m)^\s*$port\s") {
             $toAdd += $port
         }
@@ -70,12 +70,41 @@ function Test-HoneyHealth {
 }
 
 function Start-Honey {
-    
     Fix-Port-Reservations
     Write-Host "--- Uruchamianie Honeypota ---" -ForegroundColor Cyan
     wsl -d Ubuntu --cd ~/Honeypot -e docker compose up -d
+    
+    Write-Host "--- Nakladanie rygorystycznej izolacji sieciowej (Containment) ---" -ForegroundColor Red
+    Start-Sleep -Seconds 5 # Dajemy silnikowi chwile na podniesienie wirtualnego switcha
+
+    Write-Host " [1/1] Wstrzykiwanie regul RFC 1918 bezposrednio do rdzenia Dockera..." -NoNewline
+    
+    # Komenda dla naszego jednorazowego kontenera-agenta:
+    # 1. Czysci stare reguly (zapobiega puchnieciu tablicy przy restartach)
+    # 2. Pozwala na ruch wewnatrz honeypota (172.25.0.0/24)
+    # 3-5. Blokuje LAN
+    # 6. LIMITUJE wyjscie do Internetu (max 20 pakietow na sekunde)
+    # 7. ODRZUCA reszte ruchu z honeypota (blokada DDoS)
+    # 8. Pozwala na poprawny powrot pakietow do silnika Dockera
+    $fwRules = "apk add --quiet --no-cache iptables && " +
+               "iptables -F DOCKER-USER && " +
+               "iptables -A DOCKER-USER -s 172.25.0.0/24 -d 172.25.0.0/24 -j ACCEPT && " +
+               "iptables -A DOCKER-USER -s 172.25.0.0/24 -d 10.0.0.0/8 -j DROP && " +
+               "iptables -A DOCKER-USER -s 172.25.0.0/24 -d 172.16.0.0/12 -j DROP && " +
+               "iptables -A DOCKER-USER -s 172.25.0.0/24 -d 192.168.0.0/16 -j DROP && " +
+               "iptables -A DOCKER-USER -s 172.25.0.0/24 -m limit --limit 20/sec --limit-burst 50 -j ACCEPT && " +
+               "iptables -A DOCKER-USER -s 172.25.0.0/24 -j DROP && " +
+               "iptables -A DOCKER-USER -j RETURN"
+
+    # Odpalenie agenta w sieci hosta Dockera:
+    wsl -d Ubuntu -e docker run --rm --privileged --network host alpine sh -c $fwRules
+    
+    Write-Host " OK." -ForegroundColor Green
+    
+    Write-Host " [SUKCES] Izolacja zalozona na poziomie silnika! Haker nie wyjdzie do LAN!" -ForegroundColor DarkGreen
+
     Write-Host "--- Uruchomienie uslug ---" -ForegroundColor Cyan
-    Start-Sleep -Seconds 20
+    Start-Sleep -Seconds 17
     Test-HoneyHealth
     Write-Host "Gotowe. Wcisnij DOWOLNY klawisz by wrocic"
 }
@@ -209,12 +238,10 @@ do {
         '7' { LabON; Pause }
         '8' { LabOFF; Pause }
         '9' {Real-OS; Pause}
-        'q' { Write-Host "Koniec programu"; break }
+        'q' { Write-Host "Do zobaczenia... "; break }
         Default { Write-Host "Nie ma takiej opcji." -ForegroundColor Red; Start-Sleep -Seconds 1 }
     }
 
 } while ($wybor -ne 'q')
-
-
 
 
