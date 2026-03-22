@@ -19,7 +19,7 @@ System opiera się na rygorystycznej segmentacji sieciowej (Docker Networks), dz
    * **Grafana** - Interaktywny pulpit nawigacyjny (Dashboard) mapujący wektory ataków na globalną matrycę **MITRE ATT&CK**.
    * **Portainer** - Graficzny interfejs zarządzania środowiskiem kontenerowym.
 
-## ✨ Kluczowe funkcjonalności i zabezpieczenia
+## 🍯 Kluczowe funkcjonalności i zabezpieczenia
 
 * **Ścisła Izolacja Sieciowa (Containment):** Automatyczne wstrzykiwanie reguł `iptables` do łańcucha `DOCKER-USER` z poziomu hosta.
 *  Bezwzględne blokowanie prób ucieczki do sieci prywatnych (RFC 1918) oraz ochrona przed atakami DoS za pomocą modułu `limit` (max 20 pakietów/s).
@@ -32,7 +32,7 @@ System opiera się na rygorystycznej segmentacji sieciowej (Docker Networks), dz
 * **Półautomatyczny Rollback:** Błyskawiczne odtwarzanie czystego środowiska (Infrastructure as Code) zarządzane w pełni z poziomu zintegrowanego centrum dowodzenia w środowisku PowerShell.
 * **Twarde Limity Zasobów (Hard Limits):** Ścisła alokacja zasobów CPU i RAM oraz mechanizmy Healthcheck zapobiegające awariom wynikającym z wyczerpania zasobów.
 
-## 🚀 Instalacja i Uruchomienie
+## 🍯 Instalacja i Uruchomienie
 
 ### Wymagania wstępne:
 * Docker & Docker Compose
