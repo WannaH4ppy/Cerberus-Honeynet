@@ -1,43 +1,40 @@
-# 🍯 Advanced Hybrid Honeypot & Threat Intelligence Lab
+# 🍯 Honeypot Command Center & REAL-OS Environment
 
-Kompleksowe, skonteneryzowane środowisko badawcze służące do detekcji, izolacji i analizy cyberataków w czasie rzeczywistym.
-Projekt łączy pułapki o niskiej i średniej interakcji z autorskim, wysoce interaktywnym środowiskiem **REAL-OS**.
-Wyposażony w zaawansowane mechanizmy maskowania (Obfuscation) oraz natychmiastowy eksport logów (Push Architecture).
+A comprehensive, containerized research environment designed for real-time detection, isolation, and analysis of cyberattacks. This project integrates low and medium-interaction traps with a custom, high-interaction **REAL-OS** environment. It features advanced obfuscation mechanisms and instantaneous log export via a **Push Architecture**.
 
-## Architektura Systemu
+## System Architecture
+The system relies on rigorous network segmentation (**Docker Networks**), dividing the infrastructure into two distinct zones:
 
-System opiera się na rygorystycznej segmentacji sieciowej (Docker Networks), dzieląc infrastrukturę na dwie strefy:
+### 1. DMZ Zone (172.25.0.0/24) – Attack Surface
+* **REAL-OS:** A custom High-Interaction container (Ubuntu 22.04) featuring a fake web server, database, honeytokens (AWS/MySQL), and a hidden auditing system.
+* **Cowrie:** A Medium-Interaction honeypot emulating SSH and Telnet services to capture brute-force attacks and shell interaction.
+* **Dionaea:** A Low-Interaction honeypot designed to capture malware via protocols such as SMB, HTTP, and FTP.
+* **Snort NIDS:** An Intrusion Detection System listening directly on the DMZ virtual bridge.
 
-1. **Strefa DMZ (`172.25.0.0/24`) - Przestrzeń ataku:**
-   * **REAL-OS** - Autorski kontener High-Interaction (Ubuntu 22.04) z fałszywym serwerem WWW, bazą danych, honeytokenami (AWS/MySQL) i ukrytym systemem audytującym.
-   * **Cowrie** - Honeypot Medium-Interaction emulujący ataki na usługi SSH oraz Telnet.
-   * **Dionaea** - Honeypot Low-Interaction łapiący złośliwe oprogramowanie (Malware) m.in. z wykorzystaniem protokołów SMB, HTTP, FTP.
-   * **Snort NIDS** - System wykrywania intruzów nasłuchujący bezpośrednio na wirtualnym mostku strefy DMZ.
+### 2. Management Zone (172.26.0.0/24)
+* **Promtail & Loki:** Log aggregator and non-relational database for real-time telemetry.
+* **Grafana:** Interactive dashboard mapping attack vectors to the global **MITRE ATT&CK** matrix.
+* **Portainer:** Graphical user interface for container environment management.
 
-2. **Strefa Management (`172.26.0.0/24`):**
-   * **Promtail & Loki** - Agregator logów i nierelacyjna baza danych.
-   * **Grafana** - Interaktywny pulpit nawigacyjny (Dashboard) mapujący wektory ataków na globalną matrycę **MITRE ATT&CK**.
-   * **Portainer** - Graficzny interfejs zarządzania środowiskiem kontenerowym.
+---
 
-## 🍯 Kluczowe funkcjonalności i zabezpieczenia
+## 🍯 Key Features & Security
+* **Strict Network Containment:** Automatic injection of `iptables` rules into the `DOCKER-USER` chain from the host level. It enforces absolute blocking of escape attempts to private networks (RFC 1918) and provides DoS protection using the `limit` module (max 20 packets/s).
+* **Advanced Stealth & Obfuscation:** The REAL-OS environment is engineered to delay detection by intruders:
+    * **Process Mystification:** Masking the main process (PID 1) using `exec -a /sbin/init tail -f /dev/null`.
+    * **Hidden Artifacts:** Tracking agents operate in-memory under the guise of `systemd-journald` and `systemd-udevd` processes.
+    * **Immutable Keylogger:** An invisible shell-level keylogger based on hidden, `readonly` `PROMPT_COMMAND` variables.
+* **Anti-Forensics Resilience (Push Architecture):** Container compromise does not result in evidence loss. Logs and captured malicious files are streamed in real-time to the isolated Loki database before an intruder can execute `rm -rf /var/log/`.
+* **Semi-Automatic Rollback:** Rapid restoration of clean environments (Infrastructure as Code) managed entirely through an integrated **PowerShell Command Center**.
+* **Hard Resource Limits:** Strict CPU and RAM allocation combined with Healthcheck mechanisms to prevent resource exhaustion crashes.
 
-* **Ścisła Izolacja Sieciowa (Containment):** Automatyczne wstrzykiwanie reguł `iptables` do łańcucha `DOCKER-USER` z poziomu hosta.
-*  Bezwzględne blokowanie prób ucieczki do sieci prywatnych (RFC 1918) oraz ochrona przed atakami DoS za pomocą modułu `limit` (max 20 pakietów/s).
-* **Zaawansowane Maskowanie (Stealth & Obfuscation):** Środowisko REAL-OS zostało zaprojektowane z myślą o opóźnieniu demaskacji przez intruza:
-  * Mistyfikacja głównego procesu (PID 1) przy użyciu polecenia `exec -a /sbin/init tail -f /dev/null`.
-  * Ukrywanie agentów śledzących w systemie plików (narzędzia operują w pamięci pod przykrywką procesów `systemd-journald` oraz `systemd-udevd`).
-  * Niewidoczny, niemożliwy do wyłączenia z poziomu powłoki keylogger oparty o ukryte i zablokowane zmienne `PROMPT_COMMAND` (Readonly).
-* **Odporność na Anti-Forensics (Push Architecture):** Utrata kontenera nie oznacza utraty dowodów.
-*  Logi i pozyskane złośliwe pliki są w czasie rzeczywistym streamowane do odizolowanej bazy Loki, zanim intruz zdąży zrealizować komendę `rm -rf /var/log/`.
-* **Półautomatyczny Rollback:** Błyskawiczne odtwarzanie czystego środowiska (Infrastructure as Code) zarządzane w pełni z poziomu zintegrowanego centrum dowodzenia w środowisku PowerShell.
-* **Twarde Limity Zasobów (Hard Limits):** Ścisła alokacja zasobów CPU i RAM oraz mechanizmy Healthcheck zapobiegające awariom wynikającym z wyczerpania zasobów.
+---
 
-## 🍯 Instalacja i Uruchomienie
+## 🍯 Installation & Deployment
+### Prerequisites
+* **Docker & Docker Compose**
+* **Windows Subsystem for Linux (WSL2)** – recommended for `.wslconfig` environment tuning.
+* **PowerShell 5.1+**
 
-### Wymagania wstępne:
-* Docker & Docker Compose
-* Windows Subsystem for Linux (WSL2) - zalecane ze względu na konfigurację środowiskową `.wslconfig`
-* PowerShell 5.1+
-
-### Procedura startowa:
-Całym cyklem życia środowiska zarządza autorski skrypt PowerShell `Honeypot-Control.ps1`. Nie wymaga to ręcznego ingerowania w silnik Dockera.
+### Startup Procedure
+The entire lifecycle of the environment is managed by the custom `Honeypot-Control.ps1` PowerShell script. Manual intervention in the Docker engine is not required.
